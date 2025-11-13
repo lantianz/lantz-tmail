@@ -1,0 +1,15 @@
+{
+  "tasks": {
+    "start": "deno run --allow-net --allow-env --allow-read --unstable-sloppy-imports src/index.ts",
+    "dev": "deno run --allow-net --allow-env --allow-read --watch --unstable-sloppy-imports src/index.ts"
+  },
+  "imports": {
+    "hono": "npm:hono@^4.6.3",
+    "hono/cors": "npm:hono/cors",
+    "hono/logger": "npm:hono/logger",
+    "hono/pretty-json": "npm:hono/pretty-json",
+    "hono/bearer-auth": "npm:hono/bearer-auth",
+    "hono/adapter": "npm:hono/adapter"
+  },
+  "nodeModulesDir": "auto"
+} 

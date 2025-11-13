@@ -1,0 +1,54 @@
+{
+  "name": "lantz-tmail",
+  "version": "1.0.0",
+  "description": "A unified temporary email gateway service based on Hono framework",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "node dist/server.js",
+    "dev": "wrangler dev",
+    "dev:deno": "deno run --allow-net --allow-env --watch --unstable-sloppy-imports src/index.ts",
+    "dev:bun": "bun run --watch src/index.ts",
+    "dev:node": "tsx src/server.ts",
+    "build": "tsc",
+    "deploy:cloudflare": "wrangler deploy",
+    "deploy:vercel": "vercel --prod",
+    "deploy:deno": "deno run -A scripts/deploy-deno.js",
+    "deploy:netlify": "netlify deploy --prod",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "dependencies": {
+    "hono": "^4.6.3",
+    "@hono/node-server": "^1.12.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.0.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0",
+    "wrangler": "^4.0.0"
+  },
+  "keywords": [
+    "temporary-email",
+    "email-gateway",
+    "hono",
+    "cloudflare-workers",
+    "deno",
+    "vercel",
+    "api"
+  ],
+  "author": "hzruo",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hzruo/tempmailhub.git"
+  }
+} 

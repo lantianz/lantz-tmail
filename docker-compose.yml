@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  tempmailhub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tempmailhub
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      - NODE_ENV=production
+      # 可选：设置API Key启用认证
+      # - TEMPMAILHUB_API_KEY=your-secret-api-key
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8787/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M 
