@@ -401,6 +401,9 @@ app.get('/', (c) => {
                             <a href="https://etempmail.com" target="_blank" class="provider-link">
                                 EtempMail
                             </a>
+                            <a href="https://tempmailsafe.com" target="_blank" class="provider-link">
+                                TempMailSafe
+                            </a>
                         </div>
                         <p style="margin-top: 16px; color: #64748b; font-size: 0.875rem;">
                             🔧 <strong>架构优势</strong>：基于插件化设计，新增服务商只需实现 IMailProvider 接口
@@ -494,7 +497,8 @@ app.get('/api/info', (c) => {
         { id: 'tempmailplus', name: 'TempMail Plus', domains: ['mailto.plus', 'fexpost.com', 'fexbox.org', 'mailbox.in.ua', 'rover.info', 'chitthi.in', 'fextemp.com', 'any.pink', 'merepost.com'], customizable: true },
         { id: 'mailtm', name: 'Mail.tm', domains: ['somoj.com'], customizable: false },
         { id: 'etempmail', name: 'EtempMail', domains: ['cross.edu.pl', 'ohm.edu.pl', 'usa.edu.pl', 'beta.edu.pl'], customizable: false },
-        { id: 'vanishpost', name: 'VanishPost', domains: ['服务端分配'], customizable: false }
+        { id: 'vanishpost', name: 'VanishPost', domains: ['服务端分配'], customizable: false },
+        { id: 'tempmailsafe', name: 'TempMailSafe', domains: ['tempmailsafe.com', 'ai-mcp.com'], customizable: true }
       ],
       authentication: {
         enabled: getAuthConfig(c.env).enabled,
@@ -528,7 +532,7 @@ app.get('/api/info', (c) => {
 app.post('/api/mail/create', apiKeyAuth, async (c) => {
   try {
     let body = {};
-    
+
     try {
       body = await c.req.json();
     } catch (error) {
@@ -536,7 +540,7 @@ app.post('/api/mail/create', apiKeyAuth, async (c) => {
     }
 
     const result = await mailService.createEmail(body);
-    
+
     return c.json(result, result.success ? 200 : 400);
   } catch (error) {
     const response: AppResponse = {

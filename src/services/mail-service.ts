@@ -27,7 +27,7 @@ export class MailService {
         emailExpiration: !!request.expirationMinutes
       };
 
-      const provider = request.provider ? 
+      const provider = request.provider ?
         providerManager.getProvider(request.provider) :
         providerManager.getBestProvider(capabilities);
 
@@ -224,7 +224,9 @@ export class MailService {
       'beta.edu.pl': 'etempmail',
       'genmacos.com': 'vanishpost',
       'vexdren.org': 'vanishpost',
-      'bouldermac.com': 'vanishpost'
+      'bouldermac.com': 'vanishpost',
+      'tempmailsafe.com': 'tempmailsafe',
+      'ai-mcp.com': 'tempmailsafe'
     };
 
     const providerName = domainMapping[domain];

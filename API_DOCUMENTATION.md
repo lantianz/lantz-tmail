@@ -473,10 +473,11 @@ curl http://localhost:8787/api/mail/providers/stats
 | **Mail.tm** | 1个 | ✅ | ❌ | 创建时返回，请求时必须 |
 | **EtempMail** | 4个 | ❌ | ✅ | 教育域名 |
 | **VanishPost** | 服务端分配 | ❌ | ❌ | 动态域名 |
+| **TempMailSafe** | 2个 | ✅ | ✅ | tempmailsafe.com, ai-mcp.com |
 
-> **重要提醒**: 
+> **重要提醒**:
 > - 所有提供商都需要通过 TempMailHub 的 API Key 认证（第一层认证）
-> - 目前**仅 Mail.tm 需要 accessToken**（第二层认证），在创建邮箱时会返回
+> - 目前 **Mail.tm 和 TempMailSafe 需要 accessToken**（第二层认证），在创建邮箱时会返回
 
 ---
 
