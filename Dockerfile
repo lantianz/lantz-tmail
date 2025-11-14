@@ -29,6 +29,7 @@ RUN apk add --no-cache tini
 # 复制构建产物和依赖文件
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/src/views ./src/views
 
 # 安装生产依赖
 RUN npm ci --production && npm cache clean --force

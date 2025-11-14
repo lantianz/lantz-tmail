@@ -9,16 +9,9 @@
   },
   "scripts": {
     "start": "node dist/server.js",
-    "dev": "wrangler dev",
-    "dev:deno": "deno run --allow-net --allow-env --watch --unstable-sloppy-imports src/index.ts",
-    "dev:bun": "bun run --watch src/index.ts",
-    "dev:node": "tsx src/server.ts",
+    "dev": "tsx src/server.ts",
     "build": "tsc",
-    "build:vercel": "echo 'Vercel build completed'",
-    "deploy:cloudflare": "wrangler deploy",
-    "deploy:vercel": "vercel --prod",
-    "deploy:deno": "deno run -A scripts/deploy-deno.js",
-    "deploy:netlify": "netlify deploy --prod",
+    "build:vercel": "tsc",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "lint": "eslint src/**/*.ts",
@@ -26,13 +19,13 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.12.0",
+    "dotenv": "^17.2.3",
     "hono": "^4.6.3"
   },
   "optionalDependencies": {
     "imapflow": "^1.1.1"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.0.0",
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
@@ -40,22 +33,19 @@
     "prettier": "^3.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0",
-    "vitest": "^1.0.0",
-    "wrangler": "^4.0.0"
+    "vitest": "^1.0.0"
   },
   "keywords": [
     "temporary-email",
     "email-gateway",
     "hono",
-    "cloudflare-workers",
-    "deno",
-    "vercel",
+    "nodejs",
     "api"
   ],
-  "author": "hzruo",
+  "author": "lantianz",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hzruo/tempmailhub.git"
+    "url": "https://github.com/lantianz/lantz-tmail.git"
   }
 }

@@ -1,21 +1,29 @@
 version: '3.8'
 
 services:
-  tempmailhub:
+  lantz-tmail:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: tempmailhub
+    container_name: lantz-tmail
     restart: unless-stopped
     ports:
-      - "8787:8787"
+      - '8787:8787'
     environment:
       - NODE_ENV=production
       # 可选：设置API Key启用认证
       # - TEMPMAILHUB_API_KEY=your-secret-api-key
+      # 可选：设置渠道启用状态
+      # - CHANNEL_MINMAIL_ENABLED=true
+      # - CHANNEL_TEMPMAILPLUS_ENABLED=true
+      # - CHANNEL_MAILTM_ENABLED=true
+      # - CHANNEL_ETEMPMAIL_ENABLED=true
+      # - CHANNEL_VANISHPOST_ENABLED=true
+      # - CHANNEL_TEMPMAILSAFE_ENABLED=true
+      # - CHANNEL_IMAP_ENABLED=true
     # 健康检查
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8787/health"]
+      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:8787/health']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -25,4 +33,4 @@ services:
       resources:
         limits:
           cpus: '0.5'
-          memory: 256M 
+          memory: 256M

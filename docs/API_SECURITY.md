@@ -23,18 +23,6 @@ TEMPMAILHUB_API_KEY=your-secret-api-key-here
 
 ### 平台特定配置
 
-#### Cloudflare Workers
-
-1. **方式一：wrangler.toml**
-```toml
-[vars]
-TEMPMAILHUB_API_KEY = "your-secret-api-key"
-```
-
-2. **方式二：Cloudflare Dashboard**
-- 进入 Workers & Pages → 你的项目 → Settings → Environment Variables
-- 添加变量：`TEMPMAILHUB_API_KEY`
-
 #### Vercel
 
 ```bash
@@ -42,12 +30,6 @@ vercel env add TEMPMAILHUB_API_KEY
 ```
 
 或在 Vercel Dashboard 的项目设置中添加环境变量。
-
-#### Netlify
-
-在 Netlify Dashboard 的项目设置 → Environment Variables 中添加：
-- Key: `TEMPMAILHUB_API_KEY`
-- Value: `your-secret-api-key`
 
 #### Docker
 
@@ -86,22 +68,22 @@ curl -H "Authorization: Bearer your-api-key" \
 ### JavaScript 示例
 
 ```javascript
-const API_KEY = 'your-api-key';
-const BASE_URL = 'https://your-domain.com';
+const API_KEY = 'your-api-key'
+const BASE_URL = 'https://your-domain.com'
 
 const headers = {
   'Content-Type': 'application/json',
-  'Authorization': `Bearer ${API_KEY}`
-};
+  Authorization: `Bearer ${API_KEY}`,
+}
 
 // 创建邮箱
 const response = await fetch(`${BASE_URL}/api/mail/create`, {
   method: 'POST',
   headers,
-  body: JSON.stringify({ provider: 'minmail' })
-});
+  body: JSON.stringify({ provider: 'minmail' }),
+})
 
-const result = await response.json();
+const result = await response.json()
 ```
 
 ### Python 示例
@@ -181,11 +163,13 @@ echo "tmh_$(openssl rand -hex 16)"
 ### 存储安全
 
 ❌ **不要这样做**:
+
 - 硬编码在源代码中
 - 提交到版本控制系统
 - 在日志中打印完整 API Key
 
 ✅ **推荐做法**:
+
 - 使用环境变量
 - 使用密钥管理服务
 - 在日志中只显示前几位字符
@@ -220,4 +204,4 @@ curl http://localhost:8787/api/info | jq '.data.authentication'
   "header": "Authorization: Bearer <api-key>",
   "note": "API Key authentication is enabled. Protected endpoints require valid API key."
 }
-``` 
+```

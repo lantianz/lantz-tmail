@@ -1,4 +1,4 @@
-import type { Config, ChannelConfig } from '../types/index.js';
+import type { Config, ChannelConfig } from '../types/index.js'
 
 /**
  * 默认配置
@@ -12,8 +12,8 @@ export const defaultConfig: Config = {
       retries: 2,
       rateLimit: {
         requests: 30,
-        window: 60
-      }
+        window: 60,
+      },
     },
     tempmailplus: {
       enabled: true,
@@ -22,8 +22,8 @@ export const defaultConfig: Config = {
       retries: 3,
       rateLimit: {
         requests: 50,
-        window: 60
-      }
+        window: 60,
+      },
     },
     mailtm: {
       enabled: true,
@@ -32,8 +32,8 @@ export const defaultConfig: Config = {
       retries: 2,
       rateLimit: {
         requests: 20,
-        window: 60
-      }
+        window: 60,
+      },
     },
     etempmail: {
       enabled: true,
@@ -42,8 +42,8 @@ export const defaultConfig: Config = {
       retries: 2,
       rateLimit: {
         requests: 25,
-        window: 60
-      }
+        window: 60,
+      },
     },
     vanishpost: {
       enabled: true,
@@ -52,8 +52,8 @@ export const defaultConfig: Config = {
       retries: 1,
       rateLimit: {
         requests: 4, // 15分钟只能创建一个
-        window: 900
-      }
+        window: 900,
+      },
     },
     tempmailsafe: {
       enabled: true,
@@ -62,19 +62,19 @@ export const defaultConfig: Config = {
       retries: 2,
       rateLimit: {
         requests: 30,
-        window: 60
-      }
+        window: 60,
+      },
     },
     imap: {
       enabled: true,
       priority: 7,
-      timeout: 120000,  // IMAP 操作较慢，设置 120 秒超时（是其他 Provider 的两倍）
+      timeout: 120000, // IMAP 操作较慢，设置 120 秒超时（是其他 Provider 的两倍）
       retries: 1,
       rateLimit: {
         requests: 20,
-        window: 60
-      }
-    }
+        window: 60,
+      },
+    },
   },
   server: {
     port: 8080,
@@ -82,41 +82,41 @@ export const defaultConfig: Config = {
     cors: {
       origin: ['*'],
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      headers: ['Content-Type', 'Authorization', 'X-Requested-With']
-    }
+      headers: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    },
   },
   security: {
     rateLimit: {
       enabled: true,
       requests: 100,
-      window: 60
-    }
-  }
-};
+      window: 60,
+    },
+  },
+}
 
 /**
  * 配置管理器
  */
 export class ConfigManager {
-  private config: Config;
-  private readonly configSources: Map<string, () => Partial<Config>> = new Map();
+  private config: Config
+  private readonly configSources: Map<string, () => Partial<Config>> = new Map()
 
   constructor(initialConfig: Config = defaultConfig) {
-    this.config = { ...initialConfig };
+    this.config = { ...initialConfig }
   }
 
   /**
    * 获取配置
    */
   getConfig(): Config {
-    return { ...this.config };
+    return { ...this.config }
   }
 
   /**
    * 获取渠道配置
    */
   getChannelConfig(channelName: string) {
-    return this.config.channels[channelName];
+    return this.config.channels[channelName]
   }
 
   /**
@@ -126,18 +126,21 @@ export class ConfigManager {
     return Object.entries(this.config.channels)
       .filter(([_, config]) => config.enabled)
       .sort(([, a], [, b]) => a.priority - b.priority)
-      .map(([name]) => name);
+      .map(([name]) => name)
   }
 
   /**
    * 更新渠道配置
    */
-  updateChannelConfig(channelName: string, config: Partial<ChannelConfig[string]>) {
+  updateChannelConfig(
+    channelName: string,
+    config: Partial<ChannelConfig[string]>
+  ) {
     if (this.config.channels[channelName]) {
       this.config.channels[channelName] = {
         ...this.config.channels[channelName],
-        ...config
-      };
+        ...config,
+      }
     }
   }
 
@@ -145,47 +148,47 @@ export class ConfigManager {
    * 启用渠道
    */
   enableChannel(channelName: string) {
-    this.updateChannelConfig(channelName, { enabled: true });
+    this.updateChannelConfig(channelName, { enabled: true })
   }
 
   /**
    * 禁用渠道
    */
   disableChannel(channelName: string) {
-    this.updateChannelConfig(channelName, { enabled: false });
+    this.updateChannelConfig(channelName, { enabled: false })
   }
 
   /**
    * 设置渠道优先级
    */
   setChannelPriority(channelName: string, priority: number) {
-    this.updateChannelConfig(channelName, { priority });
+    this.updateChannelConfig(channelName, { priority })
   }
 
   /**
    * 添加配置源
    */
   addConfigSource(name: string, source: () => Partial<Config>) {
-    this.configSources.set(name, source);
+    this.configSources.set(name, source)
   }
 
   /**
    * 重新加载配置
    */
   async reloadConfig() {
-    let newConfig = { ...defaultConfig };
+    let newConfig = { ...defaultConfig }
 
     // 合并所有配置源
     for (const [name, source] of this.configSources) {
       try {
-        const sourceConfig = source();
-        newConfig = this.mergeConfig(newConfig, sourceConfig);
+        const sourceConfig = source()
+        newConfig = this.mergeConfig(newConfig, sourceConfig)
       } catch (error) {
-        console.warn(`Failed to load config from source ${name}:`, error);
+        console.warn(`Failed to load config from source ${name}:`, error)
       }
     }
 
-    this.config = newConfig;
+    this.config = newConfig
   }
 
   /**
@@ -193,114 +196,119 @@ export class ConfigManager {
    */
   loadFromEnv() {
     // 检查是否存在 process 对象（Node.js 环境）
-    const env = typeof globalThis !== 'undefined' && 
-                (globalThis as any).process?.env || 
-                (typeof globalThis !== 'undefined' && (globalThis as any).process ? (globalThis as any).process.env : {});
-    
-    const envConfig: Partial<Config> = {};
+    const env =
+      (typeof globalThis !== 'undefined' && (globalThis as any).process?.env) ||
+      (typeof globalThis !== 'undefined' && (globalThis as any).process
+        ? (globalThis as any).process.env
+        : {})
+
+    const envConfig: Partial<Config> = {}
 
     // 加载服务器配置
     if (env.PORT) {
       envConfig.server = {
         ...envConfig.server,
-        port: parseInt(env.PORT, 10)
-      };
+        port: parseInt(env.PORT, 10),
+      }
     }
 
     if (env.HOST) {
       envConfig.server = {
         ...envConfig.server,
-        host: env.HOST
-      };
+        host: env.HOST,
+      }
     }
 
     // 加载安全配置
     if (env.API_KEY) {
       envConfig.security = {
         ...envConfig.security,
-        apiKey: env.API_KEY
-      };
+        apiKey: env.API_KEY,
+      }
     }
 
     // 加载渠道启用状态
-    const channels: ChannelConfig = {};
+    const channels: ChannelConfig = {}
     for (const channelName of Object.keys(defaultConfig.channels)) {
-      const envKey = `CHANNEL_${channelName.toUpperCase()}_ENABLED`;
+      const envKey = `CHANNEL_${channelName.toUpperCase()}_ENABLED`
       if (env[envKey] !== undefined) {
         channels[channelName] = {
           ...defaultConfig.channels[channelName],
-          enabled: env[envKey]?.toLowerCase() === 'true'
-        };
+          enabled: env[envKey]?.toLowerCase() === 'true',
+        }
       }
     }
 
     if (Object.keys(channels).length > 0) {
-      envConfig.channels = channels;
+      envConfig.channels = channels
     }
 
-    this.config = this.mergeConfig(this.config, envConfig);
+    this.config = this.mergeConfig(this.config, envConfig)
   }
 
   /**
    * 深度合并配置
    */
   private mergeConfig(target: Config, source: Partial<Config>): Config {
-    const result = { ...target };
+    const result = { ...target }
 
     if (source.channels) {
-      result.channels = { ...result.channels };
+      result.channels = { ...result.channels }
       for (const [name, config] of Object.entries(source.channels)) {
         result.channels[name] = {
           ...result.channels[name],
-          ...config
-        };
+          ...config,
+        }
       }
     }
 
     if (source.server) {
-      result.server = { ...result.server, ...source.server };
+      result.server = { ...result.server, ...source.server }
     }
 
     if (source.security) {
-      result.security = { ...result.security, ...source.security };
+      result.security = { ...result.security, ...source.security }
     }
 
-    return result;
+    return result
   }
 
   /**
    * 验证配置
    */
   validateConfig(): { valid: boolean; errors: string[] } {
-    const errors: string[] = [];
+    const errors: string[] = []
 
     // 验证渠道配置
     for (const [name, config] of Object.entries(this.config.channels)) {
       if (config.priority < 1) {
-        errors.push(`Channel ${name} priority must be >= 1`);
+        errors.push(`Channel ${name} priority must be >= 1`)
       }
       if (config.timeout !== undefined && config.timeout < 1000) {
-        errors.push(`Channel ${name} timeout must be >= 1000ms`);
+        errors.push(`Channel ${name} timeout must be >= 1000ms`)
       }
       if (config.retries !== undefined && config.retries < 0) {
-        errors.push(`Channel ${name} retries must be >= 0`);
+        errors.push(`Channel ${name} retries must be >= 0`)
       }
     }
 
     // 验证服务器配置
-    if (this.config.server.port && (this.config.server.port < 1 || this.config.server.port > 65535)) {
-      errors.push('Server port must be between 1 and 65535');
+    if (
+      this.config.server.port &&
+      (this.config.server.port < 1 || this.config.server.port > 65535)
+    ) {
+      errors.push('Server port must be between 1 and 65535')
     }
 
     return {
       valid: errors.length === 0,
-      errors
-    };
+      errors,
+    }
   }
 }
 
 // 导出单例实例
-export const configManager = new ConfigManager();
+export const configManager = new ConfigManager()
 
-// 加载环境变量配置
-configManager.loadFromEnv(); 
+// 注意：loadFromEnv() 需要在 dotenv 加载后调用
+// 在 src/index.ts 中会调用此方法

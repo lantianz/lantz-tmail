@@ -1,177 +1,146 @@
 # TempMailHub 部署指南
 
-## 🌍 多平台部署支持
+## 🌍 Node.js 部署支持
 
-TempMailHub 支持多种部署平台，每个平台都有不同的环境变量设置方法。
+TempMailHub 基于 Node.js 运行时，支持 Docker 容器化部署和传统 Node.js 部署。
 
 ## 🔐 API Key 设置方法
 
-### 1. Cloudflare Workers
+### 1. 本地开发
 
 ```bash
-# 设置密钥
-npx wrangler secret put TEMPMAILHUB_API_KEY
+# 方法1: .env 文件（推荐）
+echo "TEMPMAILHUB_API_KEY=your-secret-key" > .env
+npm run dev
 
-# 部署
-npm run deploy:cloudflare
+# 方法2: 环境变量
+export TEMPMAILHUB_API_KEY="your-secret-key"
+npm run dev
 ```
 
 **特点**：
-- ✅ 密钥加密存储
-- ✅ 立即生效，无需重启
-- ✅ 通过 `env` 参数访问
 
-### 2. Vercel
-
-```bash
-# 方法1: 通过CLI设置
-vercel env add TEMPMAILHUB_API_KEY
-
-# 方法2: 通过Dashboard设置
-# 1. 进入项目设置 > Environment Variables
-# 2. 添加 TEMPMAILHUB_API_KEY
-# 3. 选择环境: Production, Preview, Development
-
-# 部署
-npm run deploy:vercel
-```
-
-**特点**：
-- ✅ 支持不同环境 (Production/Preview/Development)
-- ✅ 最大 64KB 变量大小
+- ✅ 简单易用
+- ✅ 支持 `.env` 文件
 - ✅ 通过 `process.env` 访问
 
-### 3. Deno Deploy
+### 2. Docker 部署
 
 ```bash
-# 方法1: 通过Dashboard设置
-# 1. 进入项目 Settings > Environment Variables  
-# 2. 添加 TEMPMAILHUB_API_KEY
+# 方法1: 通过 docker run 参数
+docker run -e TEMPMAILHUB_API_KEY="your-secret-key" -p 8787:8787 tempmailhub
 
-# 方法2: 通过CLI部署时设置
-npm run deploy:deno
-```
-
-**特点**：
-- ✅ Dashboard 图形界面设置
-- ✅ 支持生产和预览环境
-- ✅ 通过 `Deno.env.get()` 访问
-- ⚠️ 需要 `--allow-env` 权限
-
-### 4. Netlify
-
-```bash
-# 方法1: 通过Dashboard设置
-# 1. 进入 Site settings > Environment variables
-# 2. 添加 TEMPMAILHUB_API_KEY
-
-# 方法2: 通过netlify.toml设置
-# [build.environment]
-# TEMPMAILHUB_API_KEY = "your-key"
-
-# 部署
-npm run deploy:netlify
-```
-
-**特点**：
-- ✅ 构建时和运行时环境变量
-- ✅ 支持分支特定变量
-- ✅ 通过 `process.env` 访问
-
-### 5. Docker
-
-```bash
-# 方法1: 通过环境变量运行
-docker run -d -p 8787:8787 \
-  -e TEMPMAILHUB_API_KEY="your-secret-key" \
-  --name tempmailhub \
-  ghcr.io/hzruo/tempmailhub:latest
-
-# 方法2: 通过docker-compose.yml
+# 方法2: 通过 docker-compose.yml
 # environment:
 #   - TEMPMAILHUB_API_KEY=your-secret-key
 
 docker-compose up -d
 ```
 
-### 6. 本地开发
+**特点**：
+
+- ✅ 容器级别隔离
+- ✅ 易于扩展
+- ✅ 生产环境推荐
+
+### 3. 生产环境部署
 
 ```bash
-# 方法1: 环境变量
+# 构建项目
+npm run build
+
+# 设置环境变量
 export TEMPMAILHUB_API_KEY="your-secret-key"
-npm start
+export NODE_ENV="production"
+export PORT="8787"
 
-# 方法2: .env 文件
-echo "TEMPMAILHUB_API_KEY=your-secret-key" > .env
+# 启动服务
 npm start
-
-# 方法3: Vercel本地开发
-vercel env pull  # 自动拉取线上环境变量
-vercel dev
 ```
 
-## 📊 平台对比
+**特点**：
 
-| 平台 | 设置方式 | 访问方式 | 特性 |
-|------|---------|----------|------|
-| **Cloudflare Workers** | `wrangler secret put` | `env.VARIABLE` | 加密存储，立即生效 |
-| **Vercel** | Dashboard/CLI | `process.env.VARIABLE` | 多环境支持，64KB限制 |
-| **Deno Deploy** | Dashboard | `Deno.env.get()` | 图形界面，权限控制 |
-| **Netlify** | Dashboard/配置文件 | `process.env.VARIABLE` | 分支特定变量 |
-| **Docker** | 运行时参数 | `process.env.VARIABLE` | 容器级别隔离 |
+- ✅ 高性能
+- ✅ 稳定可靠
+- ✅ 支持进程管理器（PM2、systemd 等）
 
-## 🛠️ 平台特定配置
+## 📊 部署方式对比
 
-### Cloudflare Workers
+| 部署方式     | 设置方式           | 访问方式               | 适用场景   |
+| ------------ | ------------------ | ---------------------- | ---------- |
+| **本地开发** | `.env` 文件        | `process.env.VARIABLE` | 开发测试   |
+| **Docker**   | 运行时参数/compose | `process.env.VARIABLE` | 容器化部署 |
+| **生产环境** | 环境变量           | `process.env.VARIABLE` | 传统部署   |
 
-```toml
-# wrangler.toml
-name = "tempmailhub"
-main = "src/index.ts"
-compatibility_date = "2024-01-01"
+## 🛠️ 部署配置
 
-# 密钥通过 wrangler secret put 设置，不在配置文件中
+### Docker 配置
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  tempmailhub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tempmailhub
+    restart: unless-stopped
+    ports:
+      - '8787:8787'
+    environment:
+      - NODE_ENV=production
+      - TEMPMAILHUB_API_KEY=your-secret-api-key
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:8787/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
 ```
 
-### Vercel
+### PM2 配置
 
 ```json
 {
-  "version": 2,
-  "framework": null,
-  "routes": [
-    { "src": "/(.*)", "dest": "/src/index.ts" }
-  ],
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist"
+  "apps": [
+    {
+      "name": "tempmailhub",
+      "script": "dist/server.js",
+      "instances": "max",
+      "exec_mode": "cluster",
+      "env": {
+        "NODE_ENV": "production",
+        "PORT": "8787"
+      },
+      "env_production": {
+        "NODE_ENV": "production",
+        "TEMPMAILHUB_API_KEY": "your-secret-key"
+      }
+    }
+  ]
 }
 ```
 
-### Deno Deploy
+### Systemd 配置
 
-```json
-{
-  "tasks": {
-    "start": "deno run --allow-net --allow-env --allow-read src/index.ts"
-  },
-  "imports": {
-    "hono": "https://deno.land/x/hono@v3.11.11/mod.ts"
-  }
-}
-```
+```ini
+[Unit]
+Description=TempMailHub Service
+After=network.target
 
-### Netlify
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/tempmailhub
+Environment="NODE_ENV=production"
+Environment="TEMPMAILHUB_API_KEY=your-secret-key"
+Environment="PORT=8787"
+ExecStart=/usr/bin/node dist/server.js
+Restart=always
 
-```toml
-[build]
-  command = "npm run build"
-  publish = "dist"
-  functions = "netlify/functions"
-
-[[redirects]]
-  from = "/*"
-  to = "/.netlify/functions/server"
-  status = 200
+[Install]
+WantedBy=multi-user.target
 ```
 
 ## 🔍 故障排除
@@ -179,53 +148,47 @@ compatibility_date = "2024-01-01"
 ### 1. 环境变量未生效
 
 **检查步骤**：
+
 1. 访问 `/api/info` 端点查看认证状态
-2. 检查日志中的平台检测信息
+2. 检查日志中的环境信息
 3. 确认变量名拼写正确：`TEMPMAILHUB_API_KEY`
+4. 确认 `.env` 文件位于项目根目录
 
-### 2. 平台特定问题
+### 2. 端口占用问题
 
-**Cloudflare Workers**：
 ```bash
-# 确认密钥已设置
-wrangler secret list
+# 检查端口占用
+lsof -i :8787
 
-# 重新部署
-wrangler deploy
+# 修改端口
+export PORT=8080
+npm start
 ```
 
-**Vercel**：
-```bash
-# 拉取环境变量
-vercel env pull
+### 3. Docker 部署问题
 
-# 检查环境变量
-vercel env ls
-```
-
-**Deno**：
 ```bash
-# 确认权限
-deno run --allow-env src/index.ts
-```
+# 查看容器日志
+docker logs tempmailhub
 
-**Netlify**：
-```bash
-# 检查构建日志
-netlify build
+# 重启容器
+docker restart tempmailhub
+
+# 重新构建
+docker-compose up -d --build
 ```
 
 ## 📝 最佳实践
 
-1. **不要在代码中硬编码API Key**
-2. **使用平台推荐的密钥管理方式**
-3. **为不同环境设置不同的API Key**
-4. **定期轮换API Key**
-5. **监控API Key使用情况**
+1. **不要在代码中硬编码 API Key**
+2. **使用 `.env` 文件管理本地开发环境变量**
+3. **生产环境使用系统环境变量或密钥管理服务**
+4. **定期轮换 API Key**
+5. **监控 API Key 使用情况**
+6. **使用 HTTPS 保护 API 通信**
 
 ## 🔗 相关链接
 
-- [Cloudflare Workers Secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
-- [Vercel Environment Variables](https://vercel.com/docs/environment-variables)
-- [Deno Environment Variables](https://docs.deno.org.cn/runtime/reference/env_variables/)
-- [Netlify Environment Variables](https://docs.netlify.com/build/environment-variables/get-started/) 
+- [Node.js 环境变量最佳实践](https://nodejs.org/en/learn/command-line/how-to-read-environment-variables-from-nodejs)
+- [Docker 环境变量](https://docs.docker.com/compose/environment-variables/)
+- [PM2 进程管理](https://pm2.keymetrics.io/docs/usage/quick-start/)
