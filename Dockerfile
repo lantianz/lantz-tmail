@@ -12,7 +12,10 @@ RUN npm ci
 # 复制源代码
 COPY src/ ./src/
 
-# 构建项目
+# 复制构建脚本
+COPY scripts/ ./scripts/
+
+# 构建项目（会自动复制视图文件到 dist 目录）
 RUN npm run build
 
 # 生产阶段镜像
@@ -26,10 +29,9 @@ ENV NODE_ENV=production
 # 安装runtime所需的包
 RUN apk add --no-cache tini
 
-# 复制构建产物和依赖文件
+# 复制构建产物和依赖文件（dist 目录已包含视图文件）
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/src/views ./src/views
 
 # 安装生产依赖
 RUN npm ci --production && npm cache clean --force

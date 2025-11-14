@@ -10,8 +10,8 @@
   "scripts": {
     "start": "node dist/server.js",
     "dev": "tsx src/server.ts",
-    "build": "tsc",
-    "build:vercel": "tsc",
+    "build": "tsc && node scripts/copy-views.js",
+    "build:vercel": "tsc && node scripts/copy-views.js",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "lint": "eslint src/**/*.ts",
