@@ -72,9 +72,9 @@ export class MailService {
   async getEmails(query: EmailListQuery): Promise<ApiResponse<EmailMessage[]>> {
     try {
       // 从邮箱地址推断提供者
-      const provider = query.provider ? 
+      const provider = query.provider ?
         providerManager.getProvider(query.provider) :
-        this.inferProviderFromEmail(query.address);
+        this.inferProviderFromEmail(query.address, query.accessToken);
 
       if (!provider) {
         return {
@@ -116,9 +116,9 @@ export class MailService {
    */
   async getEmailContent(emailAddress: string, emailId: string, providerName?: string, accessToken?: string): Promise<ApiResponse<EmailMessage>> {
     try {
-      const provider = providerName ? 
+      const provider = providerName ?
         providerManager.getProvider(providerName) :
-        this.inferProviderFromEmail(emailAddress);
+        this.inferProviderFromEmail(emailAddress, accessToken);
 
       if (!provider) {
         return {
@@ -202,9 +202,9 @@ export class MailService {
   /**
    * 从邮箱地址推断提供者
    */
-  private inferProviderFromEmail(emailAddress: string): any {
+  private inferProviderFromEmail(emailAddress: string, accessToken?: string): any {
     const domain = emailAddress.split('@')[1];
-    
+
     // 根据域名推断提供者
     const domainMapping: Record<string, string> = {
       'atminmail.com': 'minmail',
@@ -230,7 +230,22 @@ export class MailService {
     };
 
     const providerName = domainMapping[domain];
-    return providerName ? providerManager.getProvider(providerName) : null;
+
+    // 如果在已知域名列表中找到了，直接返回
+    if (providerName) {
+      return providerManager.getProvider(providerName);
+    }
+
+    // 如果域名不在已知列表中，且提供了 accessToken，则尝试使用 IMAP Provider
+    // IMAP 是唯一支持自定义域名的 Provider
+    if (accessToken) {
+      const imapProvider = providerManager.getProvider('imap');
+      if (imapProvider) {
+        return imapProvider;
+      }
+    }
+
+    return null;
   }
 }
 

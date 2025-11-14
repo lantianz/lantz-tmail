@@ -7,6 +7,7 @@ import { MailTmProvider } from './mail-tm.js';
 import { EtempMailProvider } from './etempmail.js';
 import { VanishPostProvider } from './vanishpost.js';
 import { TempMailSafeProvider } from './tempmailsafe.js';
+import { ImapProvider } from './imap.js';
 
 /**
  * 提供者管理器实现
@@ -43,7 +44,7 @@ export class ProviderManager implements IProviderManager {
       }) : enabledProviders;
 
     // 按性能优先级排序（优先选择快速的provider）
-    const performanceOrder = ['tempmailplus', 'tempmailsafe', 'minmail', 'vanishpost', 'mailtm', 'etempmail'];
+    const performanceOrder = ['tempmailplus', 'tempmailsafe', 'minmail', 'vanishpost', 'mailtm', 'etempmail', 'imap'];
     
     const sortedProviders = compatibleProviders.sort((a, b) => {
       const aIndex = performanceOrder.indexOf(a.name);
@@ -134,7 +135,8 @@ async function initializeProviders() {
     mailtm: configManager.getChannelConfig('mailtm'),
     etempmail: configManager.getChannelConfig('etempmail'),
     vanishpost: configManager.getChannelConfig('vanishpost'),
-    tempmailsafe: configManager.getChannelConfig('tempmailsafe')
+    tempmailsafe: configManager.getChannelConfig('tempmailsafe'),
+    imap: configManager.getChannelConfig('imap')
   };
 
   // 注册所有提供者
@@ -144,7 +146,8 @@ async function initializeProviders() {
     { name: 'mailtm', Provider: MailTmProvider },
     { name: 'etempmail', Provider: EtempMailProvider },
     { name: 'vanishpost', Provider: VanishPostProvider },
-    { name: 'tempmailsafe', Provider: TempMailSafeProvider }
+    { name: 'tempmailsafe', Provider: TempMailSafeProvider },
+    { name: 'imap', Provider: ImapProvider }
   ];
 
   for (const { name, Provider } of providers) {
@@ -166,9 +169,14 @@ async function initializeProviders() {
         const provider = new Provider(channelConfig);
         await provider.initialize(channelConfig);
         providerManager.registerProvider(provider);
-        console.log(`Initialized provider: ${name}`);
+        console.log(`✅ Initialized provider: ${name}`);
       } catch (error) {
-        console.warn(`Failed to initialize provider ${name}:`, error);
+        // IMAP Provider 在非 Node.js 环境会失败，这是预期行为
+        if (name === 'imap') {
+          console.warn(`⚠️  IMAP Provider 初始化失败（可能不在 Node.js 环境）:`, error instanceof Error ? error.message : error);
+        } else {
+          console.warn(`❌ Failed to initialize provider ${name}:`, error);
+        }
       }
     }
   }

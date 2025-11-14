@@ -11,8 +11,51 @@ const mail = new Hono();
 mail.post('/create', async (c) => {
   try {
     const body = await c.req.json() as CreateEmailRequest;
+
+    // 验证 IMAP 配置
+    if (body.provider === 'imap') {
+      if (!body.imap) {
+        return c.json({
+          success: false,
+          error: '当 provider 为 "imap" 时，imap 字段为必填',
+          timestamp: new Date().toISOString()
+        }, 400);
+      }
+
+      // 验证必填字段
+      const required = ['domain', 'imap_server', 'imap_user', 'imap_pass'];
+      for (const field of required) {
+        if (!body.imap[field as keyof typeof body.imap]) {
+          return c.json({
+            success: false,
+            error: `imap.${field} 为必填字段`,
+            timestamp: new Date().toISOString()
+          }, 400);
+        }
+      }
+
+      // 验证邮箱格式
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(body.imap.imap_user)) {
+        return c.json({
+          success: false,
+          error: 'imap.imap_user 必须是有效的邮箱地址',
+          timestamp: new Date().toISOString()
+        }, 400);
+      }
+
+      // 验证端口范围
+      if (body.imap.imap_port && (body.imap.imap_port < 1 || body.imap.imap_port > 65535)) {
+        return c.json({
+          success: false,
+          error: 'imap.imap_port 必须在 1-65535 之间',
+          timestamp: new Date().toISOString()
+        }, 400);
+      }
+    }
+
     const result = await mailService.createEmail(body);
-    
+
     return c.json(result, result.success ? 200 : 400);
   } catch (error) {
     return c.json({

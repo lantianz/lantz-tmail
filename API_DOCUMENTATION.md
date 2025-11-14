@@ -214,6 +214,28 @@ Authorization: Bearer your_secret_api_key_here
 }
 ```
 
+### IMAP 连接自己的邮箱
+
+```json
+{
+  "provider": "imap",
+  "imap": {
+    "domain": "wozhangsan.me",           // 你的域名
+    "imap_server": "imap.gmail.com",     // IMAP 服务器
+    "imap_port": 993,                    // IMAP 端口（可选，默认 993）
+    "imap_user": "user@wozhangsan.me",   // 邮箱地址
+    "imap_pass": "your-app-password",    // 应用专用密码/授权码
+    "imap_dir": "INBOX"                  // 邮件目录（可选，默认 INBOX）
+  }
+}
+```
+
+> **IMAP 提供商说明**：
+> - ⚠️ **仅支持 Node.js 环境**（Vercel、自建服务器等），不支持 Cloudflare Workers
+> - 📧 支持 Gmail、QQ 邮箱、163 邮箱等所有支持 IMAP 的邮箱
+> - 🔑 必须使用应用专用密码/授权码，不能使用账号密码
+> - 📖 详细配置请参考 [IMAP_USAGE.md](./IMAP_USAGE.md)
+
 ### 响应示例
 
 **Mail.tm 提供商（包含 accessToken）**
@@ -474,10 +496,11 @@ curl http://localhost:8787/api/mail/providers/stats
 | **EtempMail** | 4个 | ❌ | ✅ | 教育域名 |
 | **VanishPost** | 服务端分配 | ❌ | ❌ | 动态域名 |
 | **TempMailSafe** | 2个 | ✅ | ✅ | tempmailsafe.com, ai-mcp.com |
+| **IMAP** | 用户自定义 | ✅ | ✅ | 连接用户自己的邮箱（Gmail、QQ等），仅支持 Node.js 环境 |
 
 > **重要提醒**:
 > - 所有提供商都需要通过 TempMailHub 的 API Key 认证（第一层认证）
-> - 目前 **Mail.tm 和 TempMailSafe 需要 accessToken**（第二层认证），在创建邮箱时会返回
+> - 目前 **Mail.tm、TempMailSafe 和 IMAP 需要 accessToken**（第二层认证），在创建邮箱时会返回
 
 ---
 

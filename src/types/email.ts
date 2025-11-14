@@ -70,12 +70,29 @@ export interface EmailStats {
   };
 }
 
+// IMAP 配置接口
+export interface ImapConfig {
+  domain: string;           // 用户域名，如 wozhangsan.me
+  imap_server: string;      // IMAP 服务器，如 imap.gmail.com
+  imap_port?: number;       // IMAP 端口，默认 993
+  imap_user: string;        // 邮箱地址，如 user@wozhangsan.me
+  imap_pass: string;        // 邮箱授权码
+  imap_dir?: string;        // 邮件目录，默认 INBOX
+}
+
+// IMAP 会话信息（包含临时邮箱地址和真实 IMAP 配置）
+export interface ImapSession {
+  tempEmailAddress: string; // 临时邮箱地址，如 random-word@wozhangsan.me
+  imapConfig: ImapConfig;   // 真实的 IMAP 配置
+}
+
 // 创建邮箱的请求参数
 export interface CreateEmailRequest {
   provider?: string;
   domain?: string;
   prefix?: string;
   expirationMinutes?: number;
+  imap?: ImapConfig;        // IMAP 配置（当 provider 为 "imap" 时必填）
 }
 
 // 创建邮箱的响应

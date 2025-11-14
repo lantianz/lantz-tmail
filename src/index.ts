@@ -404,6 +404,9 @@ app.get('/', (c) => {
                             <a href="https://tempmailsafe.com" target="_blank" class="provider-link">
                                 TempMailSafe
                             </a>
+                            <span class="provider-link" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); cursor: default;">
+                                IMAP (自定义)
+                            </span>
                         </div>
                         <p style="margin-top: 16px; color: #64748b; font-size: 0.875rem;">
                             🔧 <strong>架构优势</strong>：基于插件化设计，新增服务商只需实现 IMailProvider 接口
@@ -498,7 +501,8 @@ app.get('/api/info', (c) => {
         { id: 'mailtm', name: 'Mail.tm', domains: ['somoj.com'], customizable: false },
         { id: 'etempmail', name: 'EtempMail', domains: ['cross.edu.pl', 'ohm.edu.pl', 'usa.edu.pl', 'beta.edu.pl'], customizable: false },
         { id: 'vanishpost', name: 'VanishPost', domains: ['服务端分配'], customizable: false },
-        { id: 'tempmailsafe', name: 'TempMailSafe', domains: ['tempmailsafe.com', 'ai-mcp.com'], customizable: true }
+        { id: 'tempmailsafe', name: 'TempMailSafe', domains: ['tempmailsafe.com', 'ai-mcp.com'], customizable: true },
+        { id: 'imap', name: 'IMAP', domains: [], customizable: true }
       ],
       authentication: {
         enabled: getAuthConfig(c.env).enabled,

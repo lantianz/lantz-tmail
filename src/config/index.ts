@@ -64,6 +64,16 @@ export const defaultConfig: Config = {
         requests: 30,
         window: 60
       }
+    },
+    imap: {
+      enabled: true,
+      priority: 7,
+      timeout: 120000,  // IMAP 操作较慢，设置 120 秒超时（是其他 Provider 的两倍）
+      retries: 1,
+      rateLimit: {
+        requests: 20,
+        window: 60
+      }
     }
   },
   server: {
