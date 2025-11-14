@@ -297,27 +297,34 @@ export class ImapProvider implements IMailProvider {
    * 连接 IMAP 服务器
    */
   private async connectImap(config: ImapConfig): Promise<any> {
-    const { ImapFlow } = await import('imapflow');
+    try {
+      const { ImapFlow } = await import('imapflow');
 
-    const client = new ImapFlow({
-      host: config.imap_server,
-      port: config.imap_port || 993,
-      secure: true,
-      auth: {
-        user: config.imap_user,
-        pass: config.imap_pass
-      },
-      logger: false,
-      tls: {
-        rejectUnauthorized: true
-      },
-      // 设置连接和操作超时
-      connectionTimeout: this.timeout,
-      greetingTimeout: this.timeout
-    });
+      const client = new ImapFlow({
+        host: config.imap_server,
+        port: config.imap_port || 993,
+        secure: true,
+        auth: {
+          user: config.imap_user,
+          pass: config.imap_pass
+        },
+        logger: false,
+        tls: {
+          rejectUnauthorized: true
+        },
+        // 设置连接和操作超时
+        connectionTimeout: this.timeout,
+        greetingTimeout: this.timeout
+      });
 
-    await client.connect();
-    return client;
+      await client.connect();
+      return client;
+    } catch (error: any) {
+      if (error.code === 'MODULE_NOT_FOUND' || error.message?.includes('Cannot find module')) {
+        throw new Error('IMAP 功能不可用：imapflow 模块未安装。IMAP Provider 仅在 Node.js 环境中可用。');
+      }
+      throw error;
+    }
   }
 
 

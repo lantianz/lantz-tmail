@@ -1,6 +1,11 @@
 {
   "version": 2,
-  "routes": [{ "src": "/(.*)", "dest": "/src/index.ts" }],
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist"
+  "installCommand": "npm install --legacy-peer-deps || npm install --force || npm install",
+  "buildCommand": "npm run build:vercel",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index"
+    }
+  ]
 }
