@@ -4,8 +4,10 @@ import type {
   ChannelResponse,
   ChannelCapabilities,
   ChannelHealth,
-  ChannelStats
+  ChannelStats,
+  ChannelError
 } from '../types/channel.js';
+import { ChannelStatus, ChannelErrorType } from '../types/channel.js';
 import type {
   CreateEmailRequest,
   CreateEmailResponse,
@@ -36,7 +38,7 @@ export class ImapProvider implements IMailProvider {
     attachmentSupport: true   // ✅ 支持附件元数据(文件名、大小、类型等)
   };
 
-  private config: ChannelConfiguration;
+  readonly config: ChannelConfiguration;
   private timeout: number;
   private stats: ChannelStats;
   private connectionPool = new Map<string, { client: any; lastUsed: number }>();
@@ -52,6 +54,8 @@ export class ImapProvider implements IMailProvider {
       failedRequests: 0,
       averageResponseTime: 0,
       lastRequestTime: new Date(),
+      errorsToday: 0,
+      requestsToday: 0,
       uptime: Date.now()
     };
 
@@ -66,7 +70,8 @@ export class ImapProvider implements IMailProvider {
       throw new Error('IMAP Provider 仅支持 Node.js 环境');
     }
 
-    this.config = config;
+    // config 已在构造函数中设置，这里可以更新其他配置
+    this.timeout = config.timeout || parseInt(process.env.IMAP_TIMEOUT || '120000', 10);
     console.log('✅ IMAP Provider initialized');
   }
 
@@ -111,8 +116,8 @@ export class ImapProvider implements IMailProvider {
         },
         metadata: {
           provider: this.name,
-          timestamp: new Date().toISOString(),
-          responseTime: Date.now() - startTime
+          responseTime: Date.now() - startTime,
+          timestamp: new Date().toISOString()
         }
       };
     } catch (error) {
@@ -156,8 +161,8 @@ export class ImapProvider implements IMailProvider {
           data: messages,
           metadata: {
             provider: this.name,
-            timestamp: new Date().toISOString(),
             responseTime: Date.now() - startTime,
+            timestamp: new Date().toISOString(),
             total: messages.length
           }
         };
@@ -202,8 +207,8 @@ export class ImapProvider implements IMailProvider {
           data: message,
           metadata: {
             provider: this.name,
-            timestamp: new Date().toISOString(),
-            responseTime: Date.now() - startTime
+            responseTime: Date.now() - startTime,
+            timestamp: new Date().toISOString()
           }
         };
       } finally {
@@ -220,8 +225,18 @@ export class ImapProvider implements IMailProvider {
       ? (this.stats.successfulRequests / this.stats.totalRequests) * 100
       : 100;
 
+    // 根据成功率确定状态
+    let status: ChannelStatus;
+    if (successRate >= 80) {
+      status = ChannelStatus.ACTIVE;
+    } else if (successRate >= 50) {
+      status = ChannelStatus.ERROR;
+    } else {
+      status = ChannelStatus.ERROR;
+    }
+
     return {
-      status: successRate >= 80 ? 'healthy' : successRate >= 50 ? 'degraded' : 'unhealthy',
+      status,
       lastChecked: new Date(),
       errorCount: this.stats.failedRequests,
       successRate,
@@ -234,8 +249,16 @@ export class ImapProvider implements IMailProvider {
     return { ...this.stats };
   }
 
-  async testConnection(): Promise<boolean> {
-    return true;
+  async testConnection(): Promise<ChannelResponse<boolean>> {
+    const startTime = Date.now();
+    return {
+      success: true,
+      data: true,
+      metadata: {
+        provider: this.name,
+        responseTime: Date.now() - startTime
+      }
+    };
   }
 
   // ===== 私有方法 =====
@@ -752,24 +775,28 @@ export class ImapProvider implements IMailProvider {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     // 详细错误信息（不包含建议）
-    let detailedError = errorMessage;
+    let detailedErrorMessage = errorMessage;
+    let errorType = ChannelErrorType.UNKNOWN_ERROR;
     let errorDetails: any = undefined;
 
     // 根据错误类型提供详细信息
     if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('ETIMEDOUT')) {
-      detailedError = 'IMAP 连接失败：无法连接到服务器';
+      detailedErrorMessage = 'IMAP 连接失败：无法连接到服务器';
+      errorType = ChannelErrorType.NETWORK_ERROR;
       errorDetails = {
         reason: '网络连接失败或服务器地址错误',
         operation
       };
     } else if (errorMessage.includes('AUTHENTICATIONFAILED') || errorMessage.includes('Invalid credentials')) {
-      detailedError = 'IMAP 认证失败：用户名或密码错误';
+      detailedErrorMessage = 'IMAP 认证失败：用户名或密码错误';
+      errorType = ChannelErrorType.AUTHENTICATION_ERROR;
       errorDetails = {
         reason: '认证信息无效',
         operation
       };
     } else if (errorMessage.includes('Mailbox does not exist')) {
-      detailedError = 'IMAP 操作失败：邮箱目录不存在';
+      detailedErrorMessage = 'IMAP 操作失败：邮箱目录不存在';
+      errorType = ChannelErrorType.API_ERROR;
       errorDetails = {
         reason: '指定的邮箱目录不存在',
         operation
@@ -778,11 +805,24 @@ export class ImapProvider implements IMailProvider {
 
     console.error(`IMAP Provider ${operation} 失败:`, errorMessage);
 
+    // 创建符合 ChannelError 接口的错误对象
+    const channelError: ChannelError = Object.assign(
+      new Error(detailedErrorMessage),
+      {
+        type: errorType,
+        channelName: this.name,
+        retryable: errorType === ChannelErrorType.NETWORK_ERROR,
+        timestamp: new Date(),
+        context: errorDetails
+      }
+    );
+
     return {
       success: false,
-      error: detailedError,
+      error: channelError,
       metadata: {
         provider: this.name,
+        responseTime: 0,
         timestamp: new Date().toISOString(),
         operation,
         details: errorDetails

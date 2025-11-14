@@ -83,7 +83,8 @@ export class TempMailPlusProvider implements IMailProvider {
     failedRequests: 0,
     averageResponseTime: 0,
     errorsToday: 0,
-    requestsToday: 0
+    requestsToday: 0,
+    uptime: Date.now()
   };
 
   // 支持的域名列表

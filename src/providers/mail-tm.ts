@@ -135,7 +135,8 @@ export class MailTmProvider implements IMailProvider {
     failedRequests: 0,
     averageResponseTime: 0,
     errorsToday: 0,
-    requestsToday: 0
+    requestsToday: 0,
+    uptime: Date.now()
   };
 
   private baseUrl = 'https://api.mail.tm';

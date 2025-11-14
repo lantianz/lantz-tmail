@@ -60,6 +60,7 @@ export interface ChannelStats {
   lastRequestTime?: Date;
   errorsToday: number;
   requestsToday: number;
+  uptime: number; // 启动时间戳
 }
 
 // 渠道错误类型
@@ -87,9 +88,11 @@ export interface ChannelError extends Error {
 export interface ChannelResponseMetadata {
   provider: string;
   responseTime: number;
-  requestId: string;
+  requestId?: string;
   cached?: boolean;
   retryCount?: number;
+  timestamp?: string; // ISO 8601 格式的时间戳
+  [key: string]: any; // 允许额外的元数据字段
 }
 
 // 渠道接口方法的响应类型
