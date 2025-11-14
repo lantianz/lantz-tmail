@@ -1,12 +1,11 @@
 {
   "version": 2,
-  "framework": null,
   "routes": [{ "src": "/(.*)", "dest": "/src/index.ts" }],
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
     "api/**/*.js": {
-      "runtime": "nodejs20.x"
+      "runtime": "vercel-node@2.15.1"
     }
   }
 }
