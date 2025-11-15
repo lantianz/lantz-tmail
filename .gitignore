@@ -7,6 +7,3 @@ worker.js
 .env.local
 .DS_Store
 llms-full.txt
-# lockfile
-package-lock.json
-yarn.lock

@@ -3,7 +3,7 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 
 # 复制依赖文件
-COPY package*.json ./
+COPY package.json package-lock.json ./
 COPY tsconfig.json ./
 
 # 安装依赖
@@ -31,7 +31,7 @@ RUN apk add --no-cache tini
 
 # 复制构建产物和依赖文件（dist 目录已包含视图文件）
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/package.json /app/package-lock.json ./
 
 # 安装生产依赖
 RUN npm ci --production && npm cache clean --force
