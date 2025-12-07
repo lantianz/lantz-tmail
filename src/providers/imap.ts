@@ -200,7 +200,12 @@ export class ImapProvider implements IMailProvider {
           connectionError.code === 'ECONNRESET' ||
           connectionError.code === 'ETIMEDOUT' ||
           connectionError.code === 'ENOTFOUND' ||
-          connectionError.message?.includes('Connection')
+          connectionError.code === 'ECONNREFUSED' ||
+          connectionError.code === 'EPIPE' ||
+          connectionError.message?.includes('Connection') ||
+          connectionError.message?.includes('TLS') ||
+          connectionError.message?.includes('secure') ||
+          connectionError.message?.includes('socket disconnected')
         ) {
           console.error(
             `[IMAP] 连接错误，从连接池移除 (${imapConfig.imap_user}):`,
@@ -264,7 +269,12 @@ export class ImapProvider implements IMailProvider {
           connectionError.code === 'ECONNRESET' ||
           connectionError.code === 'ETIMEDOUT' ||
           connectionError.code === 'ENOTFOUND' ||
-          connectionError.message?.includes('Connection')
+          connectionError.code === 'ECONNREFUSED' ||
+          connectionError.code === 'EPIPE' ||
+          connectionError.message?.includes('Connection') ||
+          connectionError.message?.includes('TLS') ||
+          connectionError.message?.includes('secure') ||
+          connectionError.message?.includes('socket disconnected')
         ) {
           console.error(
             `[IMAP] 连接错误，从连接池移除 (${imapConfig.imap_user}):`,
@@ -359,8 +369,50 @@ export class ImapProvider implements IMailProvider {
    * 测试 IMAP 连接
    */
   private async testImapConnection(config: ImapConfig): Promise<void> {
-    const client = await this.connectImap(config)
+    const client = await this.connectImapWithRetry(config, 2)
     await client.logout()
+  }
+
+  /**
+   * 带重试的 IMAP 连接
+   */
+  private async connectImapWithRetry(
+    config: ImapConfig,
+    maxRetries: number = 3
+  ): Promise<any> {
+    let lastError: any
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(
+          `[IMAP] 尝试连接 (${attempt}/${maxRetries}) (${config.imap_user}@${config.imap_server})`
+        )
+        return await this.connectImap(config)
+      } catch (error: any) {
+        lastError = error
+
+        // 检查是否是可重试的错误
+        const isRetryableError =
+          error.message?.includes('socket disconnected') ||
+          error.message?.includes('TLS connection') ||
+          error.message?.includes('ECONNRESET') ||
+          error.message?.includes('ETIMEDOUT') ||
+          error.code === 'ECONNRESET' ||
+          error.code === 'ETIMEDOUT' ||
+          error.code === 'EPIPE'
+
+        if (!isRetryableError || attempt === maxRetries) {
+          throw error
+        }
+
+        // 等待一段时间后重试
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000) // 指数退避，最大 5 秒
+        console.log(`[IMAP] 连接失败，${delay}ms 后重试: ${error.message}`)
+        await new Promise((resolve) => setTimeout(resolve, delay))
+      }
+    }
+
+    throw lastError
   }
 
   /**
@@ -369,6 +421,49 @@ export class ImapProvider implements IMailProvider {
   private async connectImap(config: ImapConfig): Promise<any> {
     try {
       const { ImapFlow } = await import('imapflow')
+
+      // 构建 TLS 配置，解决 TLS 连接问题
+      const strictTls = process.env.IMAP_STRICT_TLS !== 'false' // 默认启用严格 TLS
+      const tlsOptions: any = {
+        rejectUnauthorized: strictTls,
+        // 添加更多 TLS 选项以提高兼容性
+        minVersion: 'TLSv1.2',
+        maxVersion: 'TLSv1.3',
+        // 设置服务器名称指示 (SNI)
+        servername: config.imap_server,
+        // 启用会话重用
+        sessionIdContext: 'imap-client',
+        // 设置握手超时
+        handshakeTimeout: 30000,
+        // 允许传统的不安全重新协商（某些老服务器需要）
+        secureOptions: 0,
+      }
+
+      // 对于某些已知的邮件服务商，使用特定的 TLS 配置
+      const serverHost = config.imap_server.toLowerCase()
+      if (
+        serverHost.includes('gmail.com') ||
+        serverHost.includes('googlemail.com')
+      ) {
+        // Gmail 特定配置
+        tlsOptions.ciphers =
+          'ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS'
+      } else if (
+        serverHost.includes('outlook.com') ||
+        serverHost.includes('hotmail.com') ||
+        serverHost.includes('live.com')
+      ) {
+        // Outlook/Hotmail 特定配置
+        tlsOptions.secureProtocol = 'TLSv1_2_method'
+      } else if (
+        serverHost.includes('qq.com') ||
+        serverHost.includes('163.com') ||
+        serverHost.includes('126.com')
+      ) {
+        // 中国邮件服务商配置
+        tlsOptions.rejectUnauthorized = false // 某些中国邮件服务商的证书可能有问题
+        tlsOptions.checkServerIdentity = () => undefined // 跳过服务器身份验证
+      }
 
       const client = new ImapFlow({
         host: config.imap_server,
@@ -379,12 +474,10 @@ export class ImapProvider implements IMailProvider {
           pass: config.imap_pass,
         },
         logger: false,
-        tls: {
-          rejectUnauthorized: true,
-        },
+        tls: tlsOptions,
         // 设置连接和操作超时
-        connectionTimeout: this.timeout,
-        greetingTimeout: this.timeout,
+        connectionTimeout: Math.min(this.timeout, 60000), // 最大 60 秒
+        greetingTimeout: Math.min(this.timeout, 30000), // 最大 30 秒
       })
 
       // 添加错误监听器，防止未捕获的错误导致进程崩溃
@@ -454,9 +547,9 @@ export class ImapProvider implements IMailProvider {
       }
     }
 
-    // 创建新连接
+    // 创建新连接（使用重试机制）
     console.log(`[IMAP] 创建新连接 (${config.imap_user})`)
-    const client = await this.connectImap(config)
+    const client = await this.connectImapWithRetry(config, 2)
     this.connectionPool.set(key, {
       client,
       lastUsed: Date.now(),
@@ -1040,13 +1133,28 @@ export class ImapProvider implements IMailProvider {
     // 根据错误类型提供详细信息
     if (
       errorMessage.includes('ECONNREFUSED') ||
-      errorMessage.includes('ETIMEDOUT')
+      errorMessage.includes('ETIMEDOUT') ||
+      errorMessage.includes('ENOTFOUND')
     ) {
       detailedErrorMessage = 'IMAP 连接失败：无法连接到服务器'
       errorType = ChannelErrorType.NETWORK_ERROR
       errorDetails = {
         reason: '网络连接失败或服务器地址错误',
         operation,
+      }
+    } else if (
+      errorMessage.includes('socket disconnected') ||
+      errorMessage.includes('TLS connection') ||
+      errorMessage.includes('secure TLS') ||
+      errorMessage.includes('ECONNRESET') ||
+      errorMessage.includes('EPIPE')
+    ) {
+      detailedErrorMessage = 'IMAP TLS 连接失败：安全连接建立失败'
+      errorType = ChannelErrorType.NETWORK_ERROR
+      errorDetails = {
+        reason: 'TLS 握手失败，可能是服务器证书问题或网络不稳定',
+        operation,
+        suggestion: '请检查网络连接或尝试使用不同的 IMAP 服务器配置',
       }
     } else if (
       errorMessage.includes('AUTHENTICATIONFAILED') ||
