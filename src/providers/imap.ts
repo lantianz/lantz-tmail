@@ -94,14 +94,28 @@ export class ImapProvider implements IMailProvider {
         throw new Error('当 provider 为 "imap" 时，imap 字段为必填')
       }
 
-      this.validateImapConfig(request.imap)
+      this.validateImapConfig(request.imap, request.isMine)
 
       // 2. 测试 IMAP 连接
       await this.testImapConnection(request.imap)
 
-      // 3. 生成随机的临时邮箱地址
-      const username = request.prefix || generateEmailPrefix(10)
-      const tempEmailAddress = `${username}@${request.imap.domain}`
+      // 3. 生成邮箱地址
+      let tempEmailAddress: string
+      let username: string
+      let domain: string
+
+      if (request.isMine) {
+        // isMine=true: 使用真实邮箱地址，获取所有邮件
+        tempEmailAddress = request.imap.imap_user
+        const emailParts = request.imap.imap_user.split('@')
+        username = emailParts[0]
+        domain = emailParts[1] || request.imap.domain
+      } else {
+        // isMine=false: 生成临时邮箱地址
+        username = request.prefix || generateEmailPrefix(10)
+        domain = request.imap.domain
+        tempEmailAddress = `${username}@${domain}`
+      }
 
       // 4. 生成 accessToken（包含 IMAP 配置和临时邮箱地址）
       const accessToken = await this.generateAccessToken(
@@ -109,18 +123,18 @@ export class ImapProvider implements IMailProvider {
         tempEmailAddress
       )
 
-      // 5. 返回结果（返回临时邮箱地址，而不是真实邮箱）
+      // 5. 返回结果
       this.stats.successfulRequests++
       this.updateResponseTime(Date.now() - startTime)
 
       return {
         success: true,
         data: {
-          address: tempEmailAddress, // ✅ 返回临时邮箱地址
-          domain: request.imap.domain, // ✅ 用户自定义域名
-          username: username, // ✅ 随机生成的用户名
+          address: tempEmailAddress,
+          domain: domain,
+          username: username,
           provider: this.name,
-          accessToken, // ✅ 包含真实 IMAP 配置的加密 token
+          accessToken,
           expiresAt: undefined,
         },
         metadata: {
@@ -180,6 +194,21 @@ export class ImapProvider implements IMailProvider {
             total: messages.length,
           },
         }
+      } catch (connectionError: any) {
+        // 如果是连接错误，从连接池中移除
+        if (
+          connectionError.code === 'ECONNRESET' ||
+          connectionError.code === 'ETIMEDOUT' ||
+          connectionError.code === 'ENOTFOUND' ||
+          connectionError.message?.includes('Connection')
+        ) {
+          console.error(
+            `[IMAP] 连接错误，从连接池移除 (${imapConfig.imap_user}):`,
+            connectionError.message
+          )
+          this.removeConnection(imapConfig)
+        }
+        throw connectionError
       } finally {
         // 不关闭连接，放回连接池
         this.releaseConnection(imapConfig, client)
@@ -229,6 +258,21 @@ export class ImapProvider implements IMailProvider {
             timestamp: new Date().toISOString(),
           },
         }
+      } catch (connectionError: any) {
+        // 如果是连接错误，从连接池中移除
+        if (
+          connectionError.code === 'ECONNRESET' ||
+          connectionError.code === 'ETIMEDOUT' ||
+          connectionError.code === 'ENOTFOUND' ||
+          connectionError.message?.includes('Connection')
+        ) {
+          console.error(
+            `[IMAP] 连接错误，从连接池移除 (${imapConfig.imap_user}):`,
+            connectionError.message
+          )
+          this.removeConnection(imapConfig)
+        }
+        throw connectionError
       } finally {
         this.releaseConnection(imapConfig, client)
       }
@@ -285,8 +329,12 @@ export class ImapProvider implements IMailProvider {
   /**
    * 验证 IMAP 配置
    */
-  private validateImapConfig(config: ImapConfig): void {
-    const required = ['domain', 'imap_server', 'imap_user', 'imap_pass']
+  private validateImapConfig(config: ImapConfig, isMine?: boolean): void {
+    // 当 isMine=true 时，domain 不是必填的（会从 imap_user 中提取）
+    const required = isMine
+      ? ['imap_server', 'imap_user', 'imap_pass']
+      : ['domain', 'imap_server', 'imap_user', 'imap_pass']
+
     for (const field of required) {
       if (!config[field as keyof ImapConfig]) {
         throw new Error(`imap.${field} 为必填字段`)
@@ -339,9 +387,32 @@ export class ImapProvider implements IMailProvider {
         greetingTimeout: this.timeout,
       })
 
+      // 添加错误监听器，防止未捕获的错误导致进程崩溃
+      client.on('error', (error: any) => {
+        console.error(
+          `[IMAP] 连接错误 (${config.imap_user}@${config.imap_server}):`,
+          error.message || error
+        )
+        // 从连接池中移除出错的连接
+        this.removeConnection(config)
+      })
+
+      // 添加关闭事件监听器
+      client.on('close', () => {
+        console.log(
+          `[IMAP] 连接已关闭 (${config.imap_user}@${config.imap_server})`
+        )
+        this.removeConnection(config)
+      })
+
       await client.connect()
+      console.log(`[IMAP] 连接成功 (${config.imap_user}@${config.imap_server})`)
       return client
     } catch (error: any) {
+      console.error(
+        `[IMAP] 连接失败 (${config.imap_user}@${config.imap_server}):`,
+        error.message || error
+      )
       if (
         error.code === 'MODULE_NOT_FOUND' ||
         error.message?.includes('Cannot find module')
@@ -361,12 +432,30 @@ export class ImapProvider implements IMailProvider {
     const key = this.getConnectionKey(config)
     const pooled = this.connectionPool.get(key)
 
-    if (pooled && pooled.client.usable) {
-      pooled.lastUsed = Date.now()
-      return pooled.client
+    // 检查连接是否可用
+    if (pooled) {
+      try {
+        if (pooled.client.usable) {
+          pooled.lastUsed = Date.now()
+          console.log(`[IMAP] 复用连接池中的连接 (${config.imap_user})`)
+          return pooled.client
+        } else {
+          console.log(
+            `[IMAP] 连接池中的连接不可用，移除并重新创建 (${config.imap_user})`
+          )
+          this.connectionPool.delete(key)
+        }
+      } catch (error) {
+        console.error(
+          `[IMAP] 检查连接可用性失败，移除并重新创建 (${config.imap_user}):`,
+          error
+        )
+        this.connectionPool.delete(key)
+      }
     }
 
     // 创建新连接
+    console.log(`[IMAP] 创建新连接 (${config.imap_user})`)
     const client = await this.connectImap(config)
     this.connectionPool.set(key, {
       client,
@@ -374,6 +463,28 @@ export class ImapProvider implements IMailProvider {
     })
 
     return client
+  }
+
+  /**
+   * 从连接池中移除连接
+   */
+  private removeConnection(config: ImapConfig): void {
+    const key = this.getConnectionKey(config)
+    const pooled = this.connectionPool.get(key)
+
+    if (pooled) {
+      try {
+        if (pooled.client && typeof pooled.client.logout === 'function') {
+          pooled.client.logout().catch(() => {
+            // 忽略 logout 错误
+          })
+        }
+      } catch (error) {
+        // 忽略错误
+      }
+      this.connectionPool.delete(key)
+      console.log(`[IMAP] 已从连接池移除连接 (${config.imap_user})`)
+    }
   }
 
   /**
@@ -401,15 +512,37 @@ export class ImapProvider implements IMailProvider {
   private startPoolCleanup(): void {
     setInterval(() => {
       const now = Date.now()
+      let cleanedCount = 0
+
       for (const [key, pooled] of this.connectionPool.entries()) {
-        if (now - pooled.lastUsed > this.CONNECTION_MAX_IDLE) {
+        const idleTime = now - pooled.lastUsed
+
+        // 清理超过最大空闲时间的连接
+        if (idleTime > this.CONNECTION_MAX_IDLE) {
           try {
-            pooled.client.logout()
+            if (pooled.client && typeof pooled.client.logout === 'function') {
+              pooled.client.logout().catch(() => {
+                // 忽略 logout 错误
+              })
+            }
           } catch (error) {
-            // 忽略错误
+            console.error(`[IMAP] 清理连接时出错 (${key}):`, error)
           }
           this.connectionPool.delete(key)
+          cleanedCount++
         }
+        // 检查连接是否仍然可用
+        else if (pooled.client && !pooled.client.usable) {
+          console.log(`[IMAP] 发现不可用的连接，清理 (${key})`)
+          this.connectionPool.delete(key)
+          cleanedCount++
+        }
+      }
+
+      if (cleanedCount > 0) {
+        console.log(
+          `[IMAP] 连接池清理完成，清理了 ${cleanedCount} 个连接，剩余 ${this.connectionPool.size} 个连接`
+        )
       }
     }, this.POOL_CLEANUP_INTERVAL)
   }
@@ -433,7 +566,12 @@ export class ImapProvider implements IMailProvider {
       // 使用 SINCE 搜索条件获取最近 24 小时的邮件
       const searchResults = await client.search({ since })
 
+      console.log(
+        `[IMAP] 搜索到 ${searchResults?.length || 0} 封最近 24 小时的邮件，过滤条件：收件人包含 ${tempEmailAddress}`
+      )
+
       if (!searchResults || searchResults.length === 0) {
+        console.log('[IMAP] 未找到任何邮件')
         return []
       }
 
@@ -491,9 +629,15 @@ export class ImapProvider implements IMailProvider {
       // 按时间倒序排列（最新的在前）
       messages.sort((a, b) => b.receivedAt.getTime() - a.receivedAt.getTime())
 
+      console.log(`[IMAP] 过滤后返回 ${messages.length} 封邮件`)
+
       return messages
-    } catch (error) {
-      console.error('获取邮件列表失败:', error)
+    } catch (error: any) {
+      console.error('[IMAP] 获取邮件列表失败:', {
+        error: error.message || error,
+        code: error.code,
+        stack: error.stack,
+      })
       throw error
     }
   }
@@ -505,99 +649,109 @@ export class ImapProvider implements IMailProvider {
     client: any,
     emailId: string
   ): Promise<EmailMessage> {
-    const uid = parseInt(emailId, 10)
-
-    // 获取完整邮件 (使用 UID 模式)
-    const message = await client.fetchOne(
-      uid,
-      {
-        envelope: true,
-        uid: true,
-        bodyStructure: true,
-        internalDate: true,
-        source: true,
-      },
-      { uid: true }
-    ) // ✅ 指定第一个参数是 UID 而不是序列号
-
-    if (!message) {
-      throw new Error(`邮件不存在: ${emailId}`)
-    }
-
-    const envelope = message.envelope
-
-    // 解析邮件内容
-    let textContent: string | undefined
-    let htmlContent: string | undefined
-
-    // 查找 text/plain 和 text/html 部分
-    const textPart = this.findBodyPart(message.bodyStructure, 'text/plain')
-    const htmlPart = this.findBodyPart(message.bodyStructure, 'text/html')
-
     try {
-      // 获取文本部分
-      if (textPart) {
-        const download = await client.download(uid, textPart, { uid: true })
-        if (download && download.content) {
-          // download.content 是一个 ReadableStream,需要读取流内容
-          const chunks: Buffer[] = []
-          for await (const chunk of download.content) {
-            chunks.push(chunk)
-          }
-          const buffer = Buffer.concat(chunks)
-          textContent = buffer.toString('utf-8')
-        }
-      }
-    } catch (error) {
-      console.error(`[IMAP] 邮件 ${emailId} - 获取文本内容失败:`, error)
-    }
+      const uid = parseInt(emailId, 10)
 
-    try {
-      // 获取 HTML 部分
-      if (htmlPart) {
-        const download = await client.download(uid, htmlPart, { uid: true })
-        if (download && download.content) {
-          // download.content 是一个 ReadableStream,需要读取流内容
-          const chunks: Buffer[] = []
-          for await (const chunk of download.content) {
-            chunks.push(chunk)
-          }
-          const buffer = Buffer.concat(chunks)
-          htmlContent = buffer.toString('utf-8')
-        }
-      }
-    } catch (error) {
-      console.error(`[IMAP] 邮件 ${emailId} - 获取 HTML 内容失败:`, error)
-    }
+      // 获取完整邮件 (使用 UID 模式)
+      const message = await client.fetchOne(
+        uid,
+        {
+          envelope: true,
+          uid: true,
+          bodyStructure: true,
+          internalDate: true,
+          source: true,
+        },
+        { uid: true }
+      ) // ✅ 指定第一个参数是 UID 而不是序列号
 
-    // 如果都没有获取到，尝试解析原始邮件源码
-    if (!textContent && !htmlContent && message.source) {
+      if (!message) {
+        throw new Error(`邮件不存在: ${emailId}`)
+      }
+
+      const envelope = message.envelope
+
+      // 解析邮件内容
+      let textContent: string | undefined
+      let htmlContent: string | undefined
+
+      // 查找 text/plain 和 text/html 部分
+      const textPart = this.findBodyPart(message.bodyStructure, 'text/plain')
+      const htmlPart = this.findBodyPart(message.bodyStructure, 'text/html')
+
       try {
-        const parsed = this.parseEmailSource(message.source.toString())
-        textContent = parsed.text
-        htmlContent = parsed.html
+        // 获取文本部分
+        if (textPart) {
+          const download = await client.download(uid, textPart, { uid: true })
+          if (download && download.content) {
+            // download.content 是一个 ReadableStream,需要读取流内容
+            const chunks: Buffer[] = []
+            for await (const chunk of download.content) {
+              chunks.push(chunk)
+            }
+            const buffer = Buffer.concat(chunks)
+            textContent = buffer.toString('utf-8')
+          }
+        }
       } catch (error) {
-        console.error(`[IMAP] 邮件 ${emailId} - 解析邮件源码失败:`, error)
+        console.error(`[IMAP] 邮件 ${emailId} - 获取文本内容失败:`, error)
       }
-    }
 
-    // 查找附件
-    const attachments = this.findAttachments(message.bodyStructure)
+      try {
+        // 获取 HTML 部分
+        if (htmlPart) {
+          const download = await client.download(uid, htmlPart, { uid: true })
+          if (download && download.content) {
+            // download.content 是一个 ReadableStream,需要读取流内容
+            const chunks: Buffer[] = []
+            for await (const chunk of download.content) {
+              chunks.push(chunk)
+            }
+            const buffer = Buffer.concat(chunks)
+            htmlContent = buffer.toString('utf-8')
+          }
+        }
+      } catch (error) {
+        console.error(`[IMAP] 邮件 ${emailId} - 获取 HTML 内容失败:`, error)
+      }
 
-    return {
-      id: uid.toString(),
-      from: this.parseEmailContact(envelope.from?.[0]),
-      to: envelope.to?.map((addr: any) => this.parseEmailContact(addr)) || [],
-      cc: envelope.cc?.map((addr: any) => this.parseEmailContact(addr)),
-      subject: envelope.subject || '(无主题)',
-      textContent,
-      htmlContent,
-      attachments: attachments.length > 0 ? attachments : undefined,
-      receivedAt: message.internalDate || new Date(),
-      isRead: message.flags?.has('\\Seen') || false,
-      size: message.size,
-      provider: this.name,
-      messageId: envelope.messageId,
+      // 如果都没有获取到，尝试解析原始邮件源码
+      if (!textContent && !htmlContent && message.source) {
+        try {
+          const parsed = this.parseEmailSource(message.source.toString())
+          textContent = parsed.text
+          htmlContent = parsed.html
+        } catch (error) {
+          console.error(`[IMAP] 邮件 ${emailId} - 解析邮件源码失败:`, error)
+        }
+      }
+
+      // 查找附件
+      const attachments = this.findAttachments(message.bodyStructure)
+
+      return {
+        id: uid.toString(),
+        from: this.parseEmailContact(envelope.from?.[0]),
+        to: envelope.to?.map((addr: any) => this.parseEmailContact(addr)) || [],
+        cc: envelope.cc?.map((addr: any) => this.parseEmailContact(addr)),
+        subject: envelope.subject || '(无主题)',
+        textContent,
+        htmlContent,
+        attachments: attachments.length > 0 ? attachments : undefined,
+        receivedAt: message.internalDate || new Date(),
+        isRead: message.flags?.has('\\Seen') || false,
+        size: message.size,
+        provider: this.name,
+        messageId: envelope.messageId,
+      }
+    } catch (error: any) {
+      console.error('[IMAP] 获取邮件内容失败:', {
+        emailId,
+        error: error.message || error,
+        code: error.code,
+        stack: error.stack,
+      })
+      throw error
     }
   }
 
@@ -740,6 +894,7 @@ export class ImapProvider implements IMailProvider {
 
   /**
    * 生成 accessToken（包含临时邮箱地址和真实 IMAP 配置）
+   * 每次生成都会添加当前时间戳，确保密文唯一性
    */
   private async generateAccessToken(
     config: ImapConfig,
@@ -750,6 +905,7 @@ export class ImapProvider implements IMailProvider {
     const session: ImapSession = {
       tempEmailAddress,
       imapConfig: config,
+      timestamp: Date.now(), // 添加时间戳确保每次生成的 token 不同
     }
 
     if (encryptEnabled) {
@@ -769,24 +925,63 @@ export class ImapProvider implements IMailProvider {
 
   /**
    * 解析 accessToken（获取临时邮箱地址和真实 IMAP 配置）
+   * 支持可选的 token 过期验证（通过 IMAP_TOKEN_TTL_HOURS 环境变量配置）
    */
   private async parseAccessToken(token: string): Promise<ImapSession> {
     const encryptEnabled = process.env.IMAP_ENCRYPT_TOKEN === 'true'
 
     try {
+      let session: ImapSession
+
       if (encryptEnabled) {
         // 解密模式
         const encryptionKey = process.env.IMAP_ENCRYPTION_KEY
         if (!encryptionKey) {
           throw new Error('IMAP_ENCRYPTION_KEY 环境变量未设置')
         }
-        return await CryptoUtil.decryptImapSession(token, encryptionKey)
+        session = await CryptoUtil.decryptImapSession(token, encryptionKey)
       } else {
         // 不加密模式（Base64 解码）
-        return CryptoUtil.decodeImapSession(token)
+        session = CryptoUtil.decodeImapSession(token)
       }
+
+      // 验证 token 是否过期（如果配置了有效期且 session 包含时间戳）
+      this.validateTokenExpiration(session)
+
+      return session
     } catch (error) {
+      if (error instanceof Error && error.message.includes('已过期')) {
+        throw error // 保留过期错误的具体信息
+      }
       throw new Error('无效的 accessToken')
+    }
+  }
+
+  /**
+   * 验证 token 是否过期
+   * 通过环境变量 IMAP_TOKEN_TTL_HOURS 配置有效期（小时），默认不限制
+   */
+  private validateTokenExpiration(session: ImapSession): void {
+    const ttlHours = parseInt(process.env.IMAP_TOKEN_TTL_HOURS || '0', 10)
+
+    // 未配置有效期或值为 0，不做过期检查
+    if (ttlHours <= 0) {
+      return
+    }
+
+    // 兼容旧 token（没有时间戳的 token 不做过期检查）
+    if (!session.timestamp) {
+      return
+    }
+
+    const now = Date.now()
+    const tokenAge = now - session.timestamp
+    const ttlMs = ttlHours * 60 * 60 * 1000
+
+    if (tokenAge > ttlMs) {
+      throw new Error(
+        `accessToken 已过期（有效期 ${ttlHours} 小时），请重新创建邮箱`
+      )
     }
   }
 
