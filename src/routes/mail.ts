@@ -80,8 +80,9 @@ mail.post('/list', async (c) => {
       offset?: number;
       unreadOnly?: boolean;
       since?: string;
+      recipientFilter?: string;
     };
-    
+
     if (!body.address) {
       return c.json({
         success: false,
@@ -96,7 +97,8 @@ mail.post('/list', async (c) => {
       accessToken: body.accessToken || c.req.header('Authorization')?.replace('Bearer ', ''),
       limit: body.limit || 20,
       offset: body.offset || 0,
-      unreadOnly: body.unreadOnly === true
+      unreadOnly: body.unreadOnly === true,
+      recipientFilter: body.recipientFilter
     };
 
     // 处理 since 参数
@@ -105,7 +107,7 @@ mail.post('/list', async (c) => {
     }
 
     const result = await mailService.getEmails(query);
-    
+
     return c.json(result, result.success ? 200 : 400);
   } catch (error) {
     return c.json({

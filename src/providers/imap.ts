@@ -178,7 +178,8 @@ export class ImapProvider implements IMailProvider {
         // 4. 获取最近 24 小时内发送到临时邮箱的所有邮件
         const messages = await this.fetchRecentMessages(
           client,
-          tempEmailAddress
+          tempEmailAddress,
+          query.recipientFilter
         )
 
         this.stats.successfulRequests++
@@ -644,11 +645,13 @@ export class ImapProvider implements IMailProvider {
    * 获取最近 24 小时内发送到临时邮箱的所有邮件
    * @param client IMAP 客户端
    * @param tempEmailAddress 临时邮箱地址（必填）
+   * @param recipientFilter 可选的收件人过滤地址，如果提供则使用此地址过滤，否则使用 tempEmailAddress
    * @returns 符合条件的所有邮件列表
    */
   private async fetchRecentMessages(
     client: any,
-    tempEmailAddress: string
+    tempEmailAddress: string,
+    recipientFilter?: string
   ): Promise<EmailMessage[]> {
     // 计算 24 小时前的时间
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
@@ -659,8 +662,9 @@ export class ImapProvider implements IMailProvider {
       // 使用 SINCE 搜索条件获取最近 24 小时的邮件
       const searchResults = await client.search({ since })
 
+      const filterEmail = recipientFilter || tempEmailAddress
       console.log(
-        `[IMAP] 搜索到 ${searchResults?.length || 0} 封最近 24 小时的邮件，过滤条件：收件人包含 ${tempEmailAddress}`
+        `[IMAP] 搜索到 ${searchResults?.length || 0} 封最近 24 小时的邮件，过滤条件：收件人包含 ${filterEmail}`
       )
 
       if (!searchResults || searchResults.length === 0) {
@@ -695,10 +699,12 @@ export class ImapProvider implements IMailProvider {
           envelope.bcc?.map((addr: any) => addr.address?.toLowerCase()) || []
 
         const allRecipients = [...toAddresses, ...ccAddresses, ...bccAddresses]
-        const tempEmailLower = tempEmailAddress.toLowerCase()
 
-        // 只保留发送到临时邮箱地址的邮件（完全匹配）
-        if (!allRecipients.includes(tempEmailLower)) {
+        // 使用 recipientFilter（如果提供）或默认使用 tempEmailAddress
+        const filterEmail = (recipientFilter || tempEmailAddress).toLowerCase()
+
+        // 只保留发送到指定邮箱地址的邮件（完全匹配）
+        if (!allRecipients.includes(filterEmail)) {
           continue
         }
 

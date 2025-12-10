@@ -240,6 +240,7 @@ app.post('/api/mail/list', apiKeyAuth, async (c) => {
       offset: body.offset || 0,
       unreadOnly: body.unreadOnly === true,
       since: body.since ? new Date(body.since) : undefined,
+      recipientFilter: body.recipientFilter,
     }
 
     const result = await mailService.getEmails(query)

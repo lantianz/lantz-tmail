@@ -57,6 +57,7 @@ export interface EmailListQuery {
   offset?: number
   since?: Date
   unreadOnly?: boolean
+  recipientFilter?: string // 可选的收件人过滤，用于指定要过滤的收件人地址
 }
 
 // 邮件统计信息
