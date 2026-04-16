@@ -1,194 +1,195 @@
-# TempMailHub 部署指南
+# lantz-tmail 部署指南
 
-## 🌍 Node.js 部署支持
+## 概览
 
-TempMailHub 基于 Node.js 运行时，支持 Docker 容器化部署和传统 Node.js 部署。
+当前项目推荐使用 `Docker 源码部署包` 的方式发布到服务器：
 
-## 🔐 API Key 设置方法
+1. 本地执行 `npm run pack:deploy`
+2. 上传 `release/lantz-tmail-<commit>.tar.gz`
+3. 服务器解压后复制 `.env.production.example` 为 `.env`
+4. 执行 `docker compose up -d --build`
 
-### 1. 本地开发
+这种方式参考了 `play-record` 的 API 发布流程，但保持当前仓库的单应用结构，不额外引入无必要的启动脚本。
+
+## 推荐方案：Docker 源码部署包
+
+### 1. 本地生成部署包
 
 ```bash
-# 方法1: .env 文件（推荐）
-echo "TEMPMAILHUB_API_KEY=your-secret-key" > .env
-npm run dev
-
-# 方法2: 环境变量
-export TEMPMAILHUB_API_KEY="your-secret-key"
-npm run dev
+npm run pack:deploy
 ```
 
-**特点**：
+执行成功后会生成：
 
-- ✅ 简单易用
-- ✅ 支持 `.env` 文件
-- ✅ 通过 `process.env` 访问
-
-### 2. Docker 部署
-
-```bash
-# 方法1: 通过 docker run 参数
-docker run -e TEMPMAILHUB_API_KEY="your-secret-key" -p 8787:8787 tempmailhub
-
-# 方法2: 通过 docker-compose.yml
-# environment:
-#   - TEMPMAILHUB_API_KEY=your-secret-key
-
-docker-compose up -d
+```text
+release/
+├── lantz-tmail-<commit>/
+└── lantz-tmail-<commit>.tar.gz
 ```
 
-**特点**：
+部署包内包含：
 
-- ✅ 容器级别隔离
-- ✅ 易于扩展
-- ✅ 生产环境推荐
+- `Dockerfile`
+- `docker-compose.yml`
+- `.dockerignore`
+- `.env.production.example`
+- `DEPLOY.md`
+- `VERSION`
+- `package.json`
+- `package-lock.json`
+- `tsconfig.json`
+- `src/`
+- `scripts/`
 
-### 3. 生产环境部署
+不会包含：
+
+- `node_modules/`
+- `dist/`
+- `.git/`
+- `.env`
+- 本地日志、临时文件和无关文档
+
+### 2. 上传到服务器
+
+将 `release/lantz-tmail-<commit>.tar.gz` 上传到服务器任意目录，例如：
 
 ```bash
-# 构建项目
+scp release/lantz-tmail-<commit>.tar.gz user@your-server:/srv/
+```
+
+### 3. 服务器解压并配置环境变量
+
+```bash
+cd /srv
+tar -xzf lantz-tmail-<commit>.tar.gz
+cd lantz-tmail-<commit>
+cp .env.production.example .env
+vim .env
+```
+
+推荐至少设置这些变量：
+
+```env
+PORT=8787
+TEMPMAILHUB_API_KEY=replace-with-strong-api-key
+IMAP_ENCRYPT_TOKEN=false
+IMAP_TOKEN_TTL_HOURS=0
+IMAP_TIMEOUT=120000
+IMAP_STRICT_TLS=true
+CHANNEL_MINMAIL_ENABLED=true
+CHANNEL_TEMPMAILPLUS_ENABLED=true
+CHANNEL_MAILTM_ENABLED=true
+CHANNEL_ETEMPMAIL_ENABLED=true
+CHANNEL_VANISHPOST_ENABLED=true
+CHANNEL_TEMPMAILSAFE_ENABLED=true
+CHANNEL_IMAP_ENABLED=true
+```
+
+如果你启用了：
+
+- `IMAP_ENCRYPT_TOKEN=true`
+
+还必须额外配置：
+
+- `IMAP_ENCRYPTION_KEY`
+
+### 4. 启动服务
+
+```bash
+docker compose up -d --build
+```
+
+### 5. 验证服务
+
+```bash
+docker compose ps
+docker compose logs --tail=100
+curl http://127.0.0.1:8787/health
+curl http://127.0.0.1:8787/api/info
+```
+
+## 更新版本
+
+更新流程保持一致：
+
+1. 在本地重新执行 `npm run pack:deploy`
+2. 上传新的 `lantz-tmail-<commit>.tar.gz`
+3. 在服务器解压到新目录
+4. 复制并调整 `.env`
+5. 再次执行 `docker compose up -d --build`
+
+## 直接使用仓库启动
+
+如果你不走打包流程，也可以直接在仓库根目录启动：
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+这条路径适合：
+
+- 本机测试
+- 内网服务器直接拉仓库后部署
+
+## Node.js 传统部署
+
+如果不使用 Docker，也可以走 Node.js 方式：
+
+```bash
+npm ci
 npm run build
-
-# 设置环境变量
-export TEMPMAILHUB_API_KEY="your-secret-key"
-export NODE_ENV="production"
-export PORT="8787"
-
-# 启动服务
 npm start
 ```
 
-**特点**：
+这种方式要求你自己处理：
 
-- ✅ 高性能
-- ✅ 稳定可靠
-- ✅ 支持进程管理器（PM2、systemd 等）
+- Node.js 运行环境
+- 进程守护
+- 端口与反向代理
+- 环境变量注入
 
-## 📊 部署方式对比
+## 故障排查
 
-| 部署方式     | 设置方式           | 访问方式               | 适用场景   |
-| ------------ | ------------------ | ---------------------- | ---------- |
-| **本地开发** | `.env` 文件        | `process.env.VARIABLE` | 开发测试   |
-| **Docker**   | 运行时参数/compose | `process.env.VARIABLE` | 容器化部署 |
-| **生产环境** | 环境变量           | `process.env.VARIABLE` | 传统部署   |
-
-## 🛠️ 部署配置
-
-### Docker 配置
-
-```yaml
-# docker-compose.yml
-version: '3.8'
-
-services:
-  tempmailhub:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: tempmailhub
-    restart: unless-stopped
-    ports:
-      - '8787:8787'
-    environment:
-      - NODE_ENV=production
-      - TEMPMAILHUB_API_KEY=your-secret-api-key
-    healthcheck:
-      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:8787/health']
-      interval: 30s
-      timeout: 10s
-      retries: 3
-```
-
-### PM2 配置
-
-```json
-{
-  "apps": [
-    {
-      "name": "tempmailhub",
-      "script": "dist/server.js",
-      "instances": "max",
-      "exec_mode": "cluster",
-      "env": {
-        "NODE_ENV": "production",
-        "PORT": "8787"
-      },
-      "env_production": {
-        "NODE_ENV": "production",
-        "TEMPMAILHUB_API_KEY": "your-secret-key"
-      }
-    }
-  ]
-}
-```
-
-### Systemd 配置
-
-```ini
-[Unit]
-Description=TempMailHub Service
-After=network.target
-
-[Service]
-Type=simple
-User=www-data
-WorkingDirectory=/opt/tempmailhub
-Environment="NODE_ENV=production"
-Environment="TEMPMAILHUB_API_KEY=your-secret-key"
-Environment="PORT=8787"
-ExecStart=/usr/bin/node dist/server.js
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-## 🔍 故障排除
-
-### 1. 环境变量未生效
-
-**检查步骤**：
-
-1. 访问 `/api/info` 端点查看认证状态
-2. 检查日志中的环境信息
-3. 确认变量名拼写正确：`TEMPMAILHUB_API_KEY`
-4. 确认 `.env` 文件位于项目根目录
-
-### 2. 端口占用问题
+### 1. 容器未启动
 
 ```bash
-# 检查端口占用
-lsof -i :8787
-
-# 修改端口
-export PORT=8080
-npm start
+docker compose logs --tail=200
+docker compose ps
 ```
 
-### 3. Docker 部署问题
+### 2. 健康检查失败
+
+先看服务日志，再看健康接口：
 
 ```bash
-# 查看容器日志
-docker logs tempmailhub
-
-# 重启容器
-docker restart tempmailhub
-
-# 重新构建
-docker-compose up -d --build
+docker compose logs --tail=200
+curl http://127.0.0.1:8787/health
 ```
 
-## 📝 最佳实践
+### 3. API Key 未生效
 
-1. **不要在代码中硬编码 API Key**
-2. **使用 `.env` 文件管理本地开发环境变量**
-3. **生产环境使用系统环境变量或密钥管理服务**
-4. **定期轮换 API Key**
-5. **监控 API Key 使用情况**
-6. **使用 HTTPS 保护 API 通信**
+确认 `.env` 中存在：
 
-## 🔗 相关链接
+```env
+TEMPMAILHUB_API_KEY=your-secret-key
+```
 
-- [Node.js 环境变量最佳实践](https://nodejs.org/en/learn/command-line/how-to-read-environment-variables-from-nodejs)
-- [Docker 环境变量](https://docs.docker.com/compose/environment-variables/)
-- [PM2 进程管理](https://pm2.keymetrics.io/docs/usage/quick-start/)
+然后重启容器：
+
+```bash
+docker compose up -d --build
+```
+
+### 4. IMAP 功能异常
+
+优先检查：
+
+- `CHANNEL_IMAP_ENABLED`
+- `IMAP_TIMEOUT`
+- `IMAP_STRICT_TLS`
+- `IMAP_ENCRYPTION_KEY` 是否缺失
+
+更多 TLS 相关问题可参考：
+
+- [IMAP TLS 排查](./IMAP_TLS_TROUBLESHOOTING.md)

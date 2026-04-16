@@ -1,58 +1,31 @@
-FROM node:18-alpine AS builder
+FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 
-# 复制依赖文件
 COPY package.json package-lock.json ./
 COPY tsconfig.json ./
-
-# 安装依赖
-RUN npm ci
-
-# 复制源代码
 COPY src/ ./src/
+COPY scripts/copy-views.js ./scripts/copy-views.js
 
-# 复制构建脚本
-COPY scripts/ ./scripts/
-
-# 构建项目（会自动复制视图文件到 dist 目录）
+RUN npm ci
 RUN npm run build
 
-# 生产阶段镜像
-FROM node:18-alpine AS runner
+FROM node:20-bookworm-slim AS runner
 
 WORKDIR /app
 
-# 设置环境变量
 ENV NODE_ENV=production
 
-# 安装runtime所需的包
-RUN apk add --no-cache tini
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 
-# 复制构建产物和依赖文件（dist 目录已包含视图文件）
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package.json /app/package-lock.json ./
 
-# 安装生产依赖
-RUN npm ci --production && npm cache clean --force
-
-# 创建非root用户
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nextjs -u 1001
-
-# 更改文件所有权
-RUN chown -R nextjs:nodejs /app
-USER nextjs
-
-# 暴露端口
 EXPOSE 8787
 
-# 健康检查
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8787/health || exit 1
+  CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || '8787') + '/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
 
-# 使用tini作为init进程
-ENTRYPOINT ["/sbin/tini", "--"]
+USER node
 
-# 启动命令
-CMD ["node", "dist/server.js"] 
+CMD ["node", "dist/server.js"]

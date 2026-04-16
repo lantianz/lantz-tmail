@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .wrangler/
+release/
 worker.js
 *.log
 .env

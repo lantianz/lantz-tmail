@@ -12,6 +12,7 @@
     "dev": "tsx src/server.ts",
     "build": "tsc && node scripts/copy-views.js",
     "build:vercel": "tsc && node scripts/copy-views.js",
+    "pack:deploy": "node scripts/pack-deploy.mjs",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "lint": "eslint src/**/*.ts",

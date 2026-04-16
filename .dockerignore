@@ -13,6 +13,7 @@ yarn-error.log
 dist
 build
 .wrangler
+release
 
 # 开发环境
 .env
@@ -44,6 +45,7 @@ deno.json
 *.md
 LICENSE
 CONTRIBUTING.md
+docs/superpowers
 
 # 其他
 *.log

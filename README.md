@@ -100,6 +100,40 @@ npm start
 
 ## 🚀 部署方式
 
+### Docker 源码部署包（推荐）
+
+本地先生成部署包：
+
+```bash
+npm run pack:deploy
+```
+
+生成后会得到：
+
+```text
+release/
+├── lantz-tmail-<commit>/
+└── lantz-tmail-<commit>.tar.gz
+```
+
+上传 `release/lantz-tmail-<commit>.tar.gz` 到服务器后执行：
+
+```bash
+tar -xzf lantz-tmail-<commit>.tar.gz
+cd lantz-tmail-<commit>
+cp .env.production.example .env
+vim .env
+docker compose up -d --build
+```
+
+验证服务：
+
+```bash
+docker compose ps
+docker compose logs --tail=100
+curl http://127.0.0.1:8787/health
+```
+
 ### Node.js 部署
 
 ```bash
@@ -117,16 +151,14 @@ npm start
 ### Docker 部署
 
 ```bash
-# 使用 docker-compose（推荐）
-docker-compose up -d
+# 使用项目根目录中的 .env
+cp .env.example .env
 
-# 或使用 docker run
-docker build -t lantz-tmail .
-docker run -d \
-  -p 8787:8787 \
-  -e TEMPMAILHUB_API_KEY="your-secret-key" \
-  --name lantz-tmail \
-  lantz-tmail
+# 构建并启动
+docker compose up -d --build
+
+# 查看状态
+docker compose ps
 ```
 
 ### Vercel 部署
@@ -151,9 +183,9 @@ vercel --prod
 
 ## 📚 文档
 
-- [API 文档](docs/API_DOCUMENTATION.md) - 完整的 API 接口说明和使用示例
-- [安全配置](docs/API_SECURITY.md) - API Key 认证配置指南
-- [部署指南](docs/DEPLOYMENT.md) - 详细的部署说明
+- [API 文档](docs/API_DOCUMENTATION.md) - 完整的 API 接口说明、认证说明和使用示例
+- [部署指南](docs/DEPLOYMENT.md) - Docker 源码部署包与服务器部署步骤
+- [IMAP TLS 排查](docs/IMAP_TLS_TROUBLESHOOTING.md) - IMAP TLS 连接问题处理
 
 ## 🔧 基本使用
 

@@ -238,7 +238,7 @@ Authorization: Bearer your_secret_api_key_here
 > - ✅ **支持 Node.js 环境**（自建服务器、Docker 等）
 > - 📧 支持 Gmail、QQ 邮箱、163 邮箱等所有支持 IMAP 的邮箱
 > - 🔑 必须使用应用专用密码/授权码，不能使用账号密码
-> - 📖 详细配置请参考 [IMAP_USAGE.md](./IMAP_USAGE.md)
+> - 📖 TLS 相关排查请参考 [IMAP_TLS_TROUBLESHOOTING.md](./IMAP_TLS_TROUBLESHOOTING.md)
 
 ### 响应示例
 
@@ -858,20 +858,16 @@ curl http://localhost:8787/health
 ### Docker 部署
 
 ```bash
-# 构建镜像
-docker build -t lantz-tmail .
+# 推荐：先生成源码部署包
+npm run pack:deploy
 
-# 运行容器
-docker run -d \
-  -p 8787:8787 \
-  -e TEMPMAILHUB_API_KEY="your-secret-key" \
-  --name lantz-tmail \
-  lantz-tmail
+# 上传 release/lantz-tmail-<commit>.tar.gz 到服务器后：
+tar -xzf lantz-tmail-<commit>.tar.gz
+cd lantz-tmail-<commit>
+cp .env.production.example .env
+docker compose up -d --build
 
-# 或使用 docker-compose
-docker-compose up -d
-
-# 测试
+# 测试健康检查
 curl http://localhost:8787/health
 ```
 
